@@ -8,16 +8,18 @@ Cron trigger:  python cron_job.py
 from datetime import datetime, timezone
 
 from scraper import (
+    ALERT_MIN_SCORE,
     SUBREDDITS,
     calculate_engagement_score,
     calculate_recurrence_score,
     calculate_urgency_score,
     classify_opportunity,
     is_duplicate,
+    notify_opportunity,
     save_opportunity,
     scrape_subreddit,
 )
-from scraper.database import log_scraping_run
+from scraper.database import log_scraping_run, supabase
 
 
 def process_opportunity(post_data: dict) -> dict | None:
@@ -68,7 +70,19 @@ def process_opportunity(post_data: dict) -> dict | None:
         "evidence": evidence,
     }
 
-    return save_opportunity(opportunity)
+    saved = save_opportunity(opportunity)
+
+    # Telegram alert if score meets threshold
+    if saved and saved.get("total_score", 0) >= ALERT_MIN_SCORE:
+        notified = notify_opportunity(saved)
+        if notified:
+            supabase.table("opportunities").update({
+                "notified": True,
+                "notified_at": datetime.now(timezone.utc).isoformat(),
+                "notification_channel": "telegram",
+            }).eq("id", saved["id"]).execute()
+
+    return saved
 
 
 def main() -> None:
