@@ -5,6 +5,7 @@ Run directly:  python main.py
 Cron trigger:  python cron_job.py
 """
 
+import time
 from datetime import datetime, timezone
 
 from scraper import (
@@ -93,7 +94,10 @@ def main() -> None:
     total_processed = 0
     total_new = 0
 
-    for subreddit in SUBREDDITS:
+    for i, subreddit in enumerate(SUBREDDITS):
+        if i > 0:
+            time.sleep(1.0)  # 1 request/sec — Reddit public API rate limit
+
         sub_start = datetime.now(timezone.utc)
         print(f"📡 Scraping r/{subreddit}...")
 
