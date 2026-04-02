@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
@@ -36,6 +36,21 @@ def save_opportunity(opportunity: dict) -> dict | None:
 
     result = supabase.table("opportunities").insert(opportunity).execute()
     return result.data[0] if result.data else None
+
+
+def fetch_recent_titles(days: int = 7) -> list[str]:
+    """
+    Returns titles of opportunities saved in the last N days.
+    Used for recurrence score calculation.
+    """
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    result = (
+        supabase.table("opportunities")
+        .select("title")
+        .gte("created_at", cutoff)
+        .execute()
+    )
+    return [row["title"] for row in result.data]
 
 
 def log_scraping_run(

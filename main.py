@@ -14,7 +14,9 @@ from scraper import (
     calculate_engagement_score,
     calculate_recurrence_score,
     calculate_urgency_score,
+    count_similar_posts,
     classify_opportunity,
+    fetch_recent_titles,
     is_duplicate,
     notify_opportunity,
     save_opportunity,
@@ -23,7 +25,7 @@ from scraper import (
 from scraper.database import log_scraping_run, supabase
 
 
-def process_opportunity(post_data: dict) -> dict | None:
+def process_opportunity(post_data: dict, recent_titles: list[str]) -> dict | None:
     """
     Full pipeline for a single post:
       1. Dedup check
@@ -41,9 +43,9 @@ def process_opportunity(post_data: dict) -> dict | None:
         post_data["num_comments"],
     )
 
-    # 3. Recurrence score — MVP defaults to 1 similar thread (score=10)
-    #    v2 will implement semantic similarity search
-    recurrence_score = calculate_recurrence_score(similar_threads_count=1)
+    # 3. Recurrence score — keyword overlap with last 7 days of posts
+    similar_count = count_similar_posts(post_data["title"], recent_titles)
+    recurrence_score = calculate_recurrence_score(similar_count)
 
     # 4. Urgency score via Claude Haiku
     full_text = f"{post_data['title']} {post_data['text']}"
@@ -94,6 +96,15 @@ def main() -> None:
     total_processed = 0
     total_new = 0
 
+    # Fetch recent titles once — used for recurrence scoring across all posts
+    print("📂 Loading recent posts for recurrence scoring...")
+    try:
+        recent_titles = fetch_recent_titles(days=7)
+        print(f"   {len(recent_titles)} posts from last 7 days loaded\n")
+    except Exception as e:
+        print(f"   ⚠️  Could not load recent titles: {e} — recurrence will default to 0\n")
+        recent_titles = []
+
     for i, subreddit in enumerate(SUBREDDITS):
         if i > 0:
             time.sleep(1.0)  # 1 request/sec — Reddit public API rate limit
@@ -113,7 +124,7 @@ def main() -> None:
 
             for post in posts:
                 try:
-                    result = process_opportunity(post)
+                    result = process_opportunity(post, recent_titles)
                     if result:
                         posts_new += 1
                         total_new += 1
