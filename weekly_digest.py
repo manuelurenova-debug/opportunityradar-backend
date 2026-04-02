@@ -86,7 +86,7 @@ def fetch_week_opportunities() -> list[dict]:
         .select("id, title, total_score, category, subreddit, url, upvotes, num_comments")
         .gte("created_at", cutoff)
         .eq("is_archived", False)
-        .order("total_score", ascending=False)
+        .order("total_score", desc=True)
         .execute()
     )
     return result.data or []
