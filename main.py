@@ -21,6 +21,7 @@ from scraper import (
     notify_opportunity,
     save_opportunity,
     scrape_subreddit,
+    scrape_hn,
 )
 from scraper.database import log_scraping_run, supabase
 
@@ -162,6 +163,61 @@ def main() -> None:
             print(f"   ⚠️  Could not write scraping log: {e}")
 
         print(f"   → {posts_new} new, {posts_skipped} skipped\n")
+
+    # ── Hacker News ──────────────────────────────────────────
+    time.sleep(1.0)
+    hn_start = datetime.now(timezone.utc)
+    print("📡 Scraping Hacker News (Ask HN / Show HN / Top)...")
+
+    hn_scraped = 0
+    hn_new = 0
+    hn_skipped = 0
+    hn_errors: list[str] = []
+
+    try:
+        hn_posts = scrape_hn()
+        hn_scraped = len(hn_posts)
+        print(f"   Found {hn_scraped} qualifying posts")
+
+        for post in hn_posts:
+            try:
+                result = process_opportunity(post, recent_titles)
+                if result:
+                    hn_new += 1
+                    total_new += 1
+                    print(
+                        f"   ✅ [{result['category']:22s}] "
+                        f"Score {result['total_score']:3d} | "
+                        f"{post['title'][:60]}..."
+                    )
+                else:
+                    hn_skipped += 1
+
+                total_processed += 1
+
+            except Exception as e:
+                err = f"Error on HN post {post.get('reddit_id', '?')}: {e}"
+                hn_errors.append(err)
+                print(f"   ❌ {err}")
+
+    except Exception as e:
+        err = f"HN scrape failed: {e}"
+        hn_errors.append(err)
+        print(f"   ❌ {err}")
+
+    try:
+        log_scraping_run(
+            subreddit="HackerNews",
+            posts_scraped=hn_scraped,
+            posts_new=hn_new,
+            posts_skipped=hn_skipped,
+            errors=hn_errors,
+            started_at=hn_start,
+        )
+    except Exception as e:
+        print(f"   ⚠️  Could not write HN scraping log: {e}")
+
+    print(f"   → {hn_new} new, {hn_skipped} skipped\n")
 
     elapsed = (datetime.now(timezone.utc) - started).total_seconds()
     print("─" * 60)

@@ -1,4 +1,5 @@
 from .reddit_scraper import scrape_subreddit, SUBREDDITS
+from .hn_scraper import scrape_hn
 from .scoring import (
     calculate_engagement_score,
     calculate_recurrence_score,
@@ -11,6 +12,7 @@ from .notifier import notify_opportunity, should_notify, ALERT_MIN_SCORE
 
 __all__ = [
     "scrape_subreddit",
+    "scrape_hn",
     "SUBREDDITS",
     "calculate_engagement_score",
     "calculate_recurrence_score",
